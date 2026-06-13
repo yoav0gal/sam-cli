@@ -1,0 +1,11 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Sam CLI",
+      "description": "Agent guidance for working on and using the local-first Sam CLI media-history tool.",
+      "skills": ["sam-cli"]
+    }
+  ]
+}

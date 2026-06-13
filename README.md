@@ -160,6 +160,14 @@ This is not a cloud service. It is designed to run locally against your own logg
 
 Future agents working on this project should read [docs/SAM_CLI.md](docs/SAM_CLI.md) before changing behavior. When commands, flags, schema, transcript behavior, or scraper behavior change, update that doc in the same turn.
 
+This repo also includes an installable Agent Skill:
+
+```bash
+npx skills add https://github.com/yoav0gal/sam-cli --skill sam-cli
+```
+
+The skill lives at [skills/sam-cli/SKILL.md](skills/sam-cli/SKILL.md) and tells future agents how to use and maintain Sam CLI without leaking private local data.
+
 ## Status
 
 This is early, personal automation software. YouTube and WhatsApp Web are UI-driven surfaces, so selectors and transcript internals can change. The code favors transparent local storage and small verifiable commands over a hosted service.

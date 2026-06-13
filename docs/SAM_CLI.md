@@ -20,6 +20,8 @@ After changing commands, flags, database schema, default paths, transcript behav
 - Bun TypeScript CLI.
 - Entry point: `src/cli.ts`.
 - Package bin: `sam`.
+- Public Agent Skill: `skills/sam-cli/SKILL.md`.
+- Skills.sh repo config: `skills.sh.json`.
 - Browser scrapers clone the configured Chrome profile into a temporary profile before opening pages.
 - Private local config can live in `.samrc.json` in the project or `~/.sam-cli.json`.
 - Public example config: `.samrc.example.json`.
@@ -31,6 +33,20 @@ Ignored private artifacts:
 - `exports/`
 - `logs/`
 - `*.sqlite`, `*.sqlite-shm`, `*.sqlite-wal`
+
+## Agent Skill
+
+The repo ships an Agent Skill for agents that need to use or maintain Sam CLI:
+
+```bash
+npx skills add https://github.com/yoav0gal/sam-cli --skill sam-cli
+```
+
+Skill path:
+
+- `skills/sam-cli/SKILL.md`
+
+The skill must stay privacy-focused: no real local profile paths, emails, watch-history IDs, transcripts, raw exports, WhatsApp data, or SQLite data should be included in public skill files.
 
 ## Profile Configuration
 
