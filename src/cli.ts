@@ -4,7 +4,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fetchTranscript } from "@egoist/youtube-transcript-plus";
-import yts from "yt-search";
 import { exportPageHistory } from "./page-history";
 import { exportWhatsappWeb, logWhatsappWeb } from "./whatsapp-web";
 import {
@@ -537,8 +536,7 @@ function youtubeSearchQueryForMusicPodcast(row: { title: string; detail: string 
 
 async function resolveYoutubeVideoIdForPodcast(candidate: TranscriptCandidate) {
   if (!candidate.searchQuery) return null;
-  const result = await yts(candidate.searchQuery);
-  const videos = result.videos.filter((video) => typeof video.videoId === "string" && video.seconds >= YOUTUBE_MUSIC_TRANSCRIPT_MIN_SECONDS);
+  const videos = await searchYoutubeVideos(candidate.searchQuery);
   if (videos.length === 0) return null;
 
   const expected = candidate.expectedDurationSeconds;
@@ -546,6 +544,105 @@ async function resolveYoutubeVideoIdForPodcast(candidate: TranscriptCandidate) {
     ? videos.find((video) => Math.abs(video.seconds - expected) <= 5 * 60)
     : undefined;
   return (closeDuration ?? videos[0]).videoId;
+}
+
+type YoutubeSearchVideo = {
+  videoId: string;
+  seconds: number;
+};
+
+async function searchYoutubeVideos(query: string): Promise<YoutubeSearchVideo[]> {
+  const url = new URL("https://www.youtube.com/results");
+  url.searchParams.set("search_query", query);
+
+  const response = await fetch(url, {
+    headers: {
+      "accept-language": "en-US,en;q=0.9",
+      "user-agent": "Mozilla/5.0 sam-cli",
+    },
+  });
+  if (!response.ok) throw new Error(`YouTube search failed with HTTP ${response.status}`);
+
+  const page = await response.text();
+  const initialData = extractYoutubeInitialData(page);
+  if (!initialData) return [];
+
+  const videos: YoutubeSearchVideo[] = [];
+  collectYoutubeSearchVideos(initialData, videos);
+  return videos
+    .filter((video) => video.seconds >= YOUTUBE_MUSIC_TRANSCRIPT_MIN_SECONDS)
+    .slice(0, 12);
+}
+
+function extractYoutubeInitialData(page: string) {
+  const marker = "ytInitialData";
+  const markerIndex = page.indexOf(marker);
+  if (markerIndex === -1) return null;
+
+  const start = page.indexOf("{", markerIndex);
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < page.length; i += 1) {
+    const char = page[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+    } else if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          return JSON.parse(page.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function collectYoutubeSearchVideos(value: unknown, videos: YoutubeSearchVideo[]) {
+  if (!value || typeof value !== "object") return;
+
+  if ("videoRenderer" in value) {
+    const renderer = (value as { videoRenderer?: Record<string, unknown> }).videoRenderer;
+    const videoId = typeof renderer?.videoId === "string" ? renderer.videoId : null;
+    const lengthText = textFromYoutubeRuns(renderer?.lengthText);
+    const seconds = lengthText ? durationFromText(lengthText) : null;
+    if (videoId && seconds !== null) videos.push({ videoId, seconds });
+  }
+
+  for (const child of Object.values(value)) {
+    if (videos.length >= 24) return;
+    if (child && typeof child === "object") collectYoutubeSearchVideos(child, videos);
+  }
+}
+
+function textFromYoutubeRuns(value: unknown): string | null {
+  if (!value || typeof value !== "object") return null;
+  const simpleText = (value as { simpleText?: unknown }).simpleText;
+  if (typeof simpleText === "string") return simpleText;
+
+  const runs = (value as { runs?: unknown }).runs;
+  if (!Array.isArray(runs)) return null;
+  return runs
+    .map((run) => (run && typeof run === "object" && typeof (run as { text?: unknown }).text === "string" ? (run as { text: string }).text : ""))
+    .join("");
 }
 
 type LatestRow = ReturnType<typeof getLatestYoutubeRowsFromDb>[number];

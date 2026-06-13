@@ -1,6 +1,6 @@
 {
   "name": "sam-cli",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "description": "Syncing Automatically Media: a local-first CLI for YouTube, YouTube Music, transcripts, and WhatsApp Web exports.",
   "private": false,
   "license": "MIT",
@@ -32,7 +32,6 @@
     "personal-data"
   ],
   "dependencies": {
-    "@egoist/youtube-transcript-plus": "^1.1.2",
-    "yt-search": "^2.13.1"
+    "@egoist/youtube-transcript-plus": "^1.1.2"
   }
 }

@@ -153,7 +153,7 @@ Automatic transcript sync during `export-youtube-history`:
 - YouTube Shorts are skipped.
 - YouTube Music songs are skipped.
 - YouTube Music long-form/podcast-like rows are eligible only when scraped duration is at least 10 minutes.
-- If a long YouTube Music row lacks a `video_id`, `sam-cli` uses `yt-search` to search regular YouTube by title/detail and prefers a long duration match, then stores that transcript by the resolved YouTube `video_id`.
+- If a long YouTube Music row lacks a `video_id`, `sam-cli` searches regular YouTube by title/detail and prefers a long duration match, then stores that transcript by the resolved YouTube `video_id`.
 - Existing transcripts are skipped.
 
 Manual transcript commands:
