@@ -1,0 +1,38 @@
+{
+  "name": "sam-cli",
+  "version": "0.1.0",
+  "description": "Syncing Automatically Media: a local-first CLI for YouTube, YouTube Music, transcripts, and WhatsApp Web exports.",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "homepage": "https://github.com/yoav0gal/sam-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yoav0gal/sam-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yoav0gal/sam-cli/issues"
+  },
+  "bin": {
+    "sam": "./src/cli.ts"
+  },
+  "scripts": {
+    "sam": "bun run src/cli.ts",
+    "export:youtube": "bun run src/cli.ts export-youtube-history",
+    "check": "bun run src/cli.ts --help && bun run src/cli.ts show-data-shape"
+  },
+  "keywords": [
+    "youtube",
+    "youtube-music",
+    "transcripts",
+    "whatsapp",
+    "chrome",
+    "sqlite",
+    "bun",
+    "personal-data"
+  ],
+  "dependencies": {
+    "@egoist/youtube-transcript-plus": "^1.1.2",
+    "yt-search": "^2.13.1"
+  }
+}

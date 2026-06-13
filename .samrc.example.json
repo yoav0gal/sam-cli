@@ -1,0 +1,16 @@
+{
+  "defaultProfile": "personal",
+  "profiles": {
+    "personal": {
+      "label": "Personal",
+      "email": "you@example.com",
+      "dir": "~/Library/Application Support/Google/Chrome/Profile 1"
+    },
+    "work": {
+      "label": "Work",
+      "email": "work@example.com",
+      "dir": "~/Library/Application Support/Google/Chrome/Default"
+    }
+  }
+}
+

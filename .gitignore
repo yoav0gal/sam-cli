@@ -1,0 +1,17 @@
+node_modules/
+
+# Private config and personal data
+.samrc.json
+.env
+data/
+exports/
+logs/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+

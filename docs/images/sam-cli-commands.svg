@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="500" viewBox="0 0 1120 500" role="img" aria-labelledby="title desc">
+  <title id="title">Sam CLI command examples</title>
+  <desc id="desc">A terminal style screenshot with common Sam CLI commands.</desc>
+  <rect width="1120" height="500" rx="22" fill="#0b1220"/>
+  <rect x="42" y="38" width="1036" height="424" rx="16" fill="#111827" stroke="#263445"/>
+  <circle cx="76" cy="70" r="8" fill="#ef4444"/>
+  <circle cx="102" cy="70" r="8" fill="#f59e0b"/>
+  <circle cx="128" cy="70" r="8" fill="#22c55e"/>
+  <text x="56" y="124" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20">$ sam export-youtube-history --transcript-limit 50</text>
+  <text x="56" y="164" fill="#d1d5db" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">Exported 274 rows from YouTube / YouTube Music history pages</text>
+  <text x="56" y="194" fill="#86efac" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">Transcript sync: attempted 5, saved 3, skipped existing 12, failed 0</text>
+  <text x="56" y="256" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20">$ sam youtube-latest --service music</text>
+  <text x="56" y="296" fill="#d1d5db" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">1. [youtube_music] Today | playlist | podcast-like episode</text>
+  <text x="56" y="326" fill="#d1d5db" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">   video_id: VIDEO_ID | transcript: 124226 chars</text>
+  <text x="56" y="388" fill="#93c5fd" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="20">$ sam youtube-video --video-id VIDEO_ID --transcript</text>
+  <text x="56" y="428" fill="#d1d5db" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18">transcripts: 1  |  transcript excerpt ready for reading</text>
+</svg>
