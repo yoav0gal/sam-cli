@@ -19,6 +19,7 @@ Use this skill when the task involves the `sam` command, Sam CLI source code, Yo
 ```bash
 sam --help
 sam export-youtube-history
+sam sync-youtube-delta
 sam youtube-latest --limit 20
 sam youtube-video --video-id VIDEO_ID --transcript
 sam fetch-youtube-transcript --video-id VIDEO_ID --language en
@@ -59,9 +60,10 @@ Private profile aliases belong in `.samrc.json` or `~/.sam-cli.json`. `.samrc.ex
 ## Current Design Notes
 
 - `export-youtube-history` reads the real YouTube and YouTube Music history pages through a cloned Chrome profile; it does not use Chrome local history.
+- `sync-youtube-delta` is the scheduled-friendly collector: it stores only eligible long YouTube videos and podcast-like Music rows, skips Shorts/songs, fetches missing transcripts, and reports only new rows compared with the existing SQLite DB.
 - Regular YouTube long-form `watch` rows can receive transcripts.
 - Shorts are skipped by default for reading and transcript sync.
 - YouTube Music songs are skipped; only long/podcast-like rows are transcript candidates.
-- Podcast-like YouTube Music rows without a video ID may be resolved through regular YouTube search.
+- Podcast-like YouTube Music rows without a video ID may be resolved through regular YouTube search; when resolved, the history row should link to the resolved video ID so transcript reads work later.
 - Video-level enrichment attaches to `youtube_videos.video_id`.
 - WhatsApp Web scraping is UI-driven and more fragile than YouTube scraping.

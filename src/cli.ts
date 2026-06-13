@@ -7,8 +7,11 @@ import { fetchTranscript } from "@egoist/youtube-transcript-plus";
 import { exportPageHistory } from "./page-history";
 import { exportWhatsappWeb, logWhatsappWeb } from "./whatsapp-web";
 import {
+  attachYoutubeHistoryItemVideoId,
   DEFAULT_WHATSAPP_DB,
   DEFAULT_YOUTUBE_DB,
+  getKnownYoutubeItemIds,
+  getLatestYoutubeRun,
   getLatestYoutubeRowsFromDb,
   getYoutubeVideoTranscriptText,
   getYoutubeVideoFromDb,
@@ -16,8 +19,10 @@ import {
   saveWhatsappRunToDb,
   saveYoutubeTranscriptToDb,
   saveYoutubeRowsToDb,
+  youtubeHistoryItemId,
   whatsappShapeText,
   youtubeShapeText,
+  type YoutubeHistoryRow,
 } from "./history-db";
 
 type ProfileKey = string;
@@ -60,6 +65,7 @@ Usage:
 
 Commands:
   export-youtube-history   Export from the actual YouTube + YouTube Music history pages
+  sync-youtube-delta       Store new long videos/podcasts and fetch missing transcripts
   export-whatsapp-web      Export visible WhatsApp Web chats or messages
   log-whatsapp-web         Open visible WhatsApp chats and append last messages to a run log
   ingest-youtube-export    Save an existing YouTube JSON export to SQLite
@@ -89,6 +95,21 @@ Options for export-youtube-history:
   --headless                 Run Chrome headless instead of visibly
   --keep-profile             Keep the temporary cloned browser profile for debugging
   --help                     Show help
+
+Options for sync-youtube-delta:
+  --profile <name|path>       Chrome profile from config, built-in name, directory name, or path
+  --chrome-profile-dir <path> Explicit Chrome profile directory
+  --profile-label <label>     Label to store in exports/DB rows
+  --profile-email <email>     Email/account hint to store in exports/DB rows
+  --out <path>               Raw output JSON path
+  --db <path>                SQLite DB path (default: ${DEFAULT_YOUTUBE_DB})
+  --transcript-limit <num>   Max missing transcripts to fetch per sync (default: 20)
+  --transcript-language <code>
+                             Preferred transcript language
+  --max-scrolls <number>     Page scroll passes per service (default: 8)
+  --headless                 Run Chrome headless instead of visibly
+  --keep-profile             Keep the temporary cloned browser profile for debugging
+  --json                     Print JSON instead of text
 
 Options for ingest-youtube-export:
   --in <path>                Existing YouTube JSON export path
@@ -417,7 +438,7 @@ function normalizeYoutubeVideoId(value: string) {
 
 async function fetchMissingTranscriptsForRows(options: {
   dbPath: string;
-  rows: Array<{ video_id: string | null; page_type: string; service: string; title: string; detail: string; url: string }>;
+  rows: Array<YoutubeHistoryRow>;
   limit: number;
   language?: string;
 }) {
@@ -456,6 +477,9 @@ async function fetchMissingTranscriptsForRows(options: {
       failed += 1;
       console.warn(`Transcript fetch failed for ${candidate.title} (${candidate.service}): could not resolve a YouTube video ID`);
       continue;
+    }
+    if (!candidate.video_id && candidate.item_id) {
+      attachYoutubeHistoryItemVideoId(options.dbPath, candidate.item_id, resolvedVideoId, candidate.title);
     }
 
     const existing = getYoutubeVideoFromDb(options.dbPath, resolvedVideoId);
@@ -496,24 +520,27 @@ type TranscriptCandidate = {
   url: string;
   service: string;
   expectedDurationSeconds: number | null;
+  item_id?: string;
   searchQuery?: string;
 };
 
-function transcriptCandidateFromRow(row: { video_id: string | null; page_type: string; service: string; title: string; detail: string; url: string }): TranscriptCandidate | null {
+function transcriptCandidateFromRow(row: Pick<YoutubeHistoryRow, "email" | "video_id" | "playlist_id" | "date_group" | "page_type" | "service" | "title" | "detail" | "url">): TranscriptCandidate | null {
+  const item_id = youtubeHistoryItemId(row);
   if (row.service !== "youtube_music") {
     if (!row.video_id || row.page_type !== "watch") return null;
-    return { ...row, expectedDurationSeconds: durationFromText(`${row.title} ${row.detail} ${row.url}`) };
+    return { ...row, item_id, expectedDurationSeconds: durationFromText(`${row.title} ${row.detail} ${row.url}`) };
   }
 
   const durationSeconds = durationFromText(`${row.title} ${row.detail} ${row.url}`);
   if (durationSeconds === null || durationSeconds < YOUTUBE_MUSIC_TRANSCRIPT_MIN_SECONDS) return null;
 
   if (row.video_id && row.page_type === "watch") {
-    return { ...row, expectedDurationSeconds: durationSeconds };
+    return { ...row, item_id, expectedDurationSeconds: durationSeconds };
   }
 
   return {
     ...row,
+    item_id,
     expectedDurationSeconds: durationSeconds,
     searchQuery: youtubeSearchQueryForMusicPodcast(row),
   };
@@ -646,6 +673,7 @@ function textFromYoutubeRuns(value: unknown): string | null {
 }
 
 type LatestRow = ReturnType<typeof getLatestYoutubeRowsFromDb>[number];
+type TranscriptSyncResult = Awaited<ReturnType<typeof fetchMissingTranscriptsForRows>>;
 
 function serviceMatches(row: LatestRow, service: "youtube" | "music" | "both") {
   if (service === "both") return true;
@@ -666,6 +694,61 @@ function latestRowsForDisplay(rows: LatestRow[], options: { service: "youtube" |
     .filter((row) => serviceMatches(row, options.service))
     .filter((row) => isLatestReadableRow(row, options.includeShorts))
     .slice(0, options.limit);
+}
+
+function isYoutubeDeltaSyncRow(row: YoutubeHistoryRow) {
+  return transcriptCandidateFromRow(row) !== null;
+}
+
+function printYoutubeDelta(options: {
+  previousRun: ReturnType<typeof getLatestYoutubeRun>;
+  exportedRows: number;
+  storedRows: number;
+  newRows: YoutubeHistoryRow[];
+  transcriptResult: TranscriptSyncResult;
+  dbPath: string;
+  out: string;
+}) {
+  console.log(`YouTube delta since ${options.previousRun?.exported_at ?? "first sync"}`);
+  console.log(`New videos/podcasts: ${options.newRows.length}`);
+  console.log(`Stored eligible rows: ${options.storedRows} (${options.exportedRows} scraped total)`);
+  console.log(
+    `Transcript sync: attempted ${options.transcriptResult.attempted}, saved ${options.transcriptResult.saved}, skipped existing ${options.transcriptResult.skippedExisting}, failed ${options.transcriptResult.failed}`,
+  );
+  console.log(`DB: ${options.dbPath}`);
+  console.log(`Raw export: ${options.out}`);
+
+  if (options.newRows.length === 0) return;
+
+  console.log("");
+  for (const [index, row] of options.newRows.slice(0, 20).entries()) {
+    console.log(`${index + 1}. [${row.service}] ${row.date_group ?? "unknown date"} | ${row.page_type} | ${displayTitle(row)}`);
+    console.log(`   ${row.video_id ? `video_id: ${row.video_id}` : "video_id: none"} | ${row.url}`);
+  }
+  if (options.newRows.length > 20) {
+    console.log(`...and ${options.newRows.length - 20} more new rows`);
+  }
+}
+
+function youtubeDeltaJson(options: {
+  previousRun: ReturnType<typeof getLatestYoutubeRun>;
+  exportedRows: number;
+  storedRows: number;
+  newRows: YoutubeHistoryRow[];
+  transcriptResult: TranscriptSyncResult;
+  dbPath: string;
+  out: string;
+}) {
+  return {
+    previous_run: options.previousRun,
+    exported_rows: options.exportedRows,
+    stored_rows: options.storedRows,
+    new_videos_or_podcasts: options.newRows.length,
+    transcript_sync: options.transcriptResult,
+    db: options.dbPath,
+    raw_export: options.out,
+    new_rows: options.newRows,
+  };
 }
 
 function displayTitle(row: { title: string; detail: string }) {
@@ -805,6 +888,41 @@ async function main() {
     if (!opts.videoId) throw new Error("show-youtube-video requires --video-id <id>");
     const dbPath = cliPath(opts.dbPath, DEFAULT_YOUTUBE_DB);
     console.log(JSON.stringify(getYoutubeVideoFromDb(dbPath, normalizeYoutubeVideoId(opts.videoId)), null, 2));
+    return;
+  }
+  if (opts.command === "sync-youtube-delta") {
+    const dbPath = cliPath(opts.dbPath, DEFAULT_YOUTUBE_DB);
+    const previousRun = getLatestYoutubeRun(dbPath);
+    const knownItemIds = getKnownYoutubeItemIds(dbPath);
+    const out = cliPath(opts.out, join("exports", `youtube-delta-${new Date().toISOString().replace(/[:.]/g, "-")}.json`));
+    const result = await exportPageHistory({
+      profile: chromeProfile,
+      service: "both",
+      out,
+      maxScrolls: opts.maxScrolls,
+      headless: opts.headless,
+      keepProfile: opts.keepProfile,
+    });
+    const eligibleRows = (result.rows as YoutubeHistoryRow[]).filter(isYoutubeDeltaSyncRow);
+    const newRows = eligibleRows.filter((row) => !knownItemIds.has(youtubeHistoryItemId(row)));
+    const dbResult = saveYoutubeRowsToDb(dbPath, eligibleRows);
+    const transcriptResult = await fetchMissingTranscriptsForRows({
+      dbPath,
+      rows: eligibleRows,
+      limit: opts.transcriptLimit,
+      language: opts.transcriptLanguage,
+    });
+    const delta = {
+      previousRun,
+      exportedRows: result.rows.length,
+      storedRows: dbResult.rows,
+      newRows,
+      transcriptResult,
+      dbPath,
+      out: result.out,
+    };
+    if (opts.json) console.log(JSON.stringify(youtubeDeltaJson(delta), null, 2));
+    else printYoutubeDelta(delta);
     return;
   }
   if (opts.command === "youtube-latest") {

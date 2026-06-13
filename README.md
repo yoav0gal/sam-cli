@@ -82,6 +82,13 @@ Sync YouTube and YouTube Music:
 sam export-youtube-history
 ```
 
+Sync only the new long videos/podcasts and fetch transcripts:
+
+```bash
+sam sync-youtube-delta
+sam sync-youtube-delta --max-scrolls 4 --transcript-limit 20
+```
+
 Read latest long-form videos and podcast-like listens:
 
 ```bash
@@ -138,6 +145,8 @@ sam export-youtube-history --transcript-limit 50
 sam export-youtube-history --transcript-language en
 sam export-youtube-history --no-transcripts
 ```
+
+For scheduled collection, `sam sync-youtube-delta` stores only eligible long videos/podcasts, skips Shorts and normal songs, fetches missing transcripts, and prints only rows that are new compared with the existing SQLite database.
 
 Transcript fetching uses `@egoist/youtube-transcript-plus`, an unofficial free YouTube transcript library. It only works when YouTube exposes captions/transcripts and may need maintenance if YouTube changes internals.
 

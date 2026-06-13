@@ -83,6 +83,7 @@ sam export-youtube-history --profile-label Personal --profile-email you@example.
 ```bash
 sam --help
 sam export-youtube-history
+sam sync-youtube-delta
 sam export-whatsapp-web --list-chats
 sam log-whatsapp-web
 sam show-data-shape
@@ -140,6 +141,26 @@ What it scrapes:
 - The pages usually expose date groups like `Today` / `Yesterday`, not exact watch timestamps.
 - Per-run page order is stored in `youtube_run_items.position_in_run`.
 
+Delta sync command:
+
+```bash
+sam sync-youtube-delta
+sam sync-youtube-delta --max-scrolls 4 --transcript-limit 20
+sam sync-youtube-delta --json
+```
+
+`sync-youtube-delta` is intended for scheduled collection. It opens the real YouTube and YouTube Music history pages, stores only regular YouTube `watch` rows and long/podcast-like YouTube Music rows, skips Shorts and normal songs, fetches missing transcripts for eligible rows, and prints only rows that are new compared with the existing SQLite database. It still writes the raw browser scrape under `exports/` for private audit/debugging.
+
+When a podcast-like YouTube Music row does not expose a `video_id`, Sam CLI resolves it through regular YouTube search and links the history row to the resolved video before storing the transcript, so later reads can find the transcript from that row.
+
+The command's text output is delta-first:
+
+- previous sync timestamp, or `first sync`
+- new videos/podcasts count
+- stored eligible row count versus total scraped rows
+- transcript sync stats
+- a compact list of new rows only
+
 ## Transcript Behavior
 
 Transcript dependency:
@@ -153,8 +174,10 @@ Automatic transcript sync during `export-youtube-history`:
 - YouTube Shorts are skipped.
 - YouTube Music songs are skipped.
 - YouTube Music long-form/podcast-like rows are eligible only when scraped duration is at least 10 minutes.
-- If a long YouTube Music row lacks a `video_id`, `sam-cli` searches regular YouTube by title/detail and prefers a long duration match, then stores that transcript by the resolved YouTube `video_id`.
+- If a long YouTube Music row lacks a `video_id`, `sam-cli` searches regular YouTube by title/detail and prefers a long duration match, links the history row to that resolved `video_id`, then stores the transcript by the resolved YouTube `video_id`.
 - Existing transcripts are skipped.
+
+Automatic transcript sync during `sync-youtube-delta` follows the same candidate rules, but the command reports only the current delta of new eligible history rows.
 
 Manual transcript commands:
 
@@ -247,6 +270,7 @@ sam show-data-shape
 sam youtube-latest --limit 5
 sam show-youtube-video --video-id VIDEO_ID
 sam youtube-video --video-id VIDEO_ID --transcript --transcript-chars 1000
+sam sync-youtube-delta --max-scrolls 1 --transcript-limit 1
 ```
 
 Small real sync check:

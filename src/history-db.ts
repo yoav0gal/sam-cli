@@ -127,14 +127,7 @@ export function saveYoutubeRowsToDb(dbPath: string, rows: YoutubeHistoryRow[], e
   const write = db.transaction(() => {
     insertRun.run(runId, exportedAt, rows.length);
     for (const [position, row] of rows.entries()) {
-      const itemId = stableHash([
-        row.email,
-        row.service,
-        row.video_id ?? row.url,
-        row.playlist_id ?? "",
-        row.date_group ?? "",
-        row.page_type,
-      ]);
+      const itemId = youtubeHistoryItemId(row);
 
       if (row.video_id) {
         upsertVideo.run(row.video_id, canonicalYoutubeUrl(row.video_id), row.title, exportedAt, exportedAt);
@@ -166,6 +159,70 @@ export function saveYoutubeRowsToDb(dbPath: string, rows: YoutubeHistoryRow[], e
   write();
   db.close();
   return { dbPath, runId, rows: rows.length };
+}
+
+export function youtubeHistoryItemId(row: Pick<YoutubeHistoryRow, "email" | "service" | "video_id" | "url" | "playlist_id" | "date_group" | "page_type">) {
+  return stableHash([
+    row.email,
+    row.service,
+    row.video_id ?? row.url,
+    row.playlist_id ?? "",
+    row.date_group ?? "",
+    row.page_type,
+  ]);
+}
+
+export function getKnownYoutubeItemIds(dbPath: string) {
+  mkdirSync(dirname(dbPath), { recursive: true });
+  const db = new Database(dbPath);
+  ensureYoutubeSchema(db);
+  const rows = db.query("SELECT item_id FROM youtube_history_items").all() as Array<{ item_id: string }>;
+  db.close();
+  return new Set(rows.map((row) => row.item_id));
+}
+
+export function getLatestYoutubeRun(dbPath: string) {
+  mkdirSync(dirname(dbPath), { recursive: true });
+  const db = new Database(dbPath);
+  ensureYoutubeSchema(db);
+  const run = db.query(`
+    SELECT run_id, exported_at, row_count
+    FROM youtube_import_runs
+    ORDER BY exported_at DESC
+    LIMIT 1
+  `).get() as { run_id: string; exported_at: string; row_count: number } | null;
+  db.close();
+  return run;
+}
+
+export function attachYoutubeHistoryItemVideoId(dbPath: string, itemId: string, videoId: string, title: string) {
+  mkdirSync(dirname(dbPath), { recursive: true });
+  const db = new Database(dbPath);
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA foreign_keys = ON");
+  ensureYoutubeSchema(db);
+  const now = new Date().toISOString();
+
+  const write = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO youtube_videos (
+        video_id, canonical_url, first_title, first_seen_at, last_seen_at
+      ) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(video_id) DO UPDATE SET
+        canonical_url = COALESCE(excluded.canonical_url, youtube_videos.canonical_url),
+        first_title = COALESCE(youtube_videos.first_title, excluded.first_title),
+        last_seen_at = excluded.last_seen_at
+    `).run(videoId, canonicalYoutubeUrl(videoId), title, now, now);
+
+    db.prepare(`
+      UPDATE youtube_history_items
+      SET video_id = ?
+      WHERE item_id = ? AND video_id IS NULL
+    `).run(videoId, itemId);
+  });
+
+  write();
+  db.close();
 }
 
 export function saveWhatsappRunToDb(dbPath: string, run: WhatsappRunLog) {
